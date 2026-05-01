@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Remotion 多版本批量处理</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #0a0a0a;
+  --panel: #161616;
+  --border: #2a2a2a;
+  --fg: #f5f5f5;
+  --muted: #888;
+  --accent: #FFD93D;
+  --pending: #6b7280;
+  --running: #3b82f6;
+  --done: #10b981;
+  --failed: #ef4444;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.5 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+header .meta { color: var(--muted); font-size: 13px; }
+header a { color: var(--accent); text-decoration: none; }
+main {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+.panel h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+.versions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.versions label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.versions label:hover { background: #1f1f1f; }
+.versions input[type=radio] { accent-color: var(--accent); }
+.versions input[type=radio]:checked + .label-text { color: var(--accent); }
+.versions label:has(input:checked) { border-color: var(--accent); background: rgba(255,217,61,0.06); }
+
+input[type=file] {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: #0a0a0a;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  cursor: pointer;
+}
+.btn {
+  background: var(--accent);
+  color: #000;
+  border: 0;
+  font-weight: 700;
+  padding: 11px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  margin-top: 12px;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  padding: 4px 10px;
+  font-weight: 500;
+  margin: 0;
+}
+.btn.secondary:hover { color: var(--fg); border-color: var(--fg); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  vertical-align: middle;
+}
+th { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge.pending { background: rgba(107,114,128,0.2); color: #9ca3af; }
+.badge.running { background: rgba(59,130,246,0.2); color: #60a5fa; }
+.badge.done { background: rgba(16,185,129,0.2); color: #34d399; }
+.badge.failed { background: rgba(239,68,68,0.2); color: #f87171; }
+
+.log {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 380px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.empty { color: var(--muted); text-align: center; padding: 30px 0; }
+
+a.dl {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+a.dl:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎬 Remotion 多版本批量处理</h1>
+  <span class="meta">支持 .mp4/.mov/.mkv/.avi/.webm/.m4v</span>
+  <span style="margin-left:auto"><a href="/">← 回主站</a></span>
+</header>
+
+<main>
+
+<form id="up" class="panel">
+  <h2>1. 选择版本</h2>
+  <div class="versions">
+    {% for v, label in version_labels.items() %}
+    <label>
+      <input type="radio" name="version" value="{{ v }}" {% if v == 'v5' %}checked{% endif %}>
+      <span class="label-text">{{ label }}</span>
+    </label>
+    {% endfor %}
+  </div>
+
+  <h2 style="margin-top:22px">2. 上传视频（可多选）</h2>
+  <input type="file" name="files" multiple accept="video/*" required>
+
+  <button type="submit" class="btn">开始处理</button>
+  <span id="upmsg" style="margin-left:12px;color:var(--muted);font-size:13px"></span>
+</form>
+
+<div class="panel">
+  <h2>任务队列 <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">每 2 秒自动刷新</span></h2>
+  <div id="jobs">
+    <div class="empty">暂无任务</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+const form = document.getElementById('up');
+const upmsg = document.getElementById('upmsg');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(form);
+  const btn = form.querySelector('button');
+  btn.disabled = true;
+  upmsg.textContent = '上传中...';
+  try {
+    const r = await fetch('/api/remotion/upload', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || '上传失败');
+    upmsg.textContent = `已加入队列：${j.queued} 条`;
+    form.reset();
+    // 默认选中 v5
+    const v5 = form.querySelector('input[value=v5]');
+    if (v5) v5.checked = true;
+    refresh();
+  } catch (err) {
+    upmsg.textContent = '错误：' + err.message;
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => upmsg.textContent = '', 4000);
+  }
+});
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/remotion/jobs');
+    const j = await r.json();
+    renderJobs(j.jobs);
+  } catch (e) { /* ignore */ }
+}
+
+function renderJobs(jobs) {
+  const c = document.getElementById('jobs');
+  if (!jobs.length) {
+    c.innerHTML = '<div class="empty">暂无任务</div>';
+    return;
+  }
+  const rows = jobs.map(j => {
+    const statusBadge = `<span class="badge ${j.status}">${statusText(j.status)}</span>`;
+    const log = (j.log || []).join(' / ');
+    let action = '';
+    if (j.status === 'done' && j.output_url) {
+      action = `<a class="dl" href="${j.output_url}" target="_blank">▶ 播放</a>
+                &nbsp;&nbsp;<a class="dl" href="${j.output_url}" download="${j.output_filename}">⬇ 下载</a>`;
+    } else if (j.status === 'failed') {
+      action = `<span style="color:var(--failed);font-size:12px">${escapeHtml(j.error || '失败')}</span>`;
+    } else {
+      action = '<span style="color:var(--muted);font-size:12px">处理中…</span>';
+    }
+    const del = `<button class="btn secondary" onclick="del('${j.id}')">删除</button>`;
+    return `<tr>
+      <td><strong>${escapeHtml(j.name)}</strong></td>
+      <td>${j.version.toUpperCase()}</td>
+      <td>${statusBadge}</td>
+      <td class="log">${escapeHtml(log)}</td>
+      <td>${action}</td>
+      <td>${del}</td>
+    </tr>`;
+  }).join('');
+  c.innerHTML = `<table>
+    <thead><tr><th>视频</th><th>版本</th><th>状态</th><th>日志</th><th>结果</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function statusText(s) {
+  return { pending: '排队中', running: '处理中', done: '完成', failed: '失败' }[s] || s;
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+async function del(id) {
+  if (!confirm('删除这个任务？(会删除上传的视频和已生成的 mp4)')) return;
+  await fetch('/api/remotion/delete/' + id, { method: 'POST' });
+  refresh();
+}
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>视频字幕封面系统</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>视频字幕封面系统</h1>
+  <nav>
+    <button onclick="upload()">⬆️ 上传视频</button>
+    <input type="file" id="file" multiple accept="video/*" style="display:none">
+    <button onclick="scan()">🔍 扫描 inbox/</button>
+    <button onclick="processAllAndDownload()" class="primary">🚀 处理全部并自动下载</button>
+    <button onclick="processAll()">▶️ 全部处理（不下载）</button>
+    <a href="/download_all_mp4" class="btn-link">⬇️ 打包下载全部 mp4</a>
+    <button class="danger" onclick="deleteAllSources()">🗑️ 删除所有原视频</button>
+    <button onclick="refresh()">🔄 刷新</button>
+  </nav>
+</header>
+
+<main>
+  <table id="tbl">
+    <thead>
+      <tr><th>文件</th><th>大小</th><th>状态</th><th>操作</th></tr>
+    </thead>
+    <tbody id="rows">
+    {% for it in items %}
+      <tr data-stem="{{ it.stem }}">
+        <td>{{ it.name }}</td>
+        <td>{{ it.size_mb }} MB</td>
+        <td class="status">{{ it.status }}</td>
+        <td>
+          {% if it.source_exists and it.status != 'done' %}
+            <button onclick="process('{{ it.stem }}')">处理</button>
+          {% endif %}
+          {% if it.status == 'done' %}
+            <a href="/detail/{{ it.stem }}">详情</a>
+            <a href="/download_mp4/{{ it.stem }}" download>⬇️ mp4</a>
+            <button class="danger-outline" onclick="delOutput('{{ it.stem }}')">删除产物</button>
+          {% endif %}
+          {% if it.source_exists %}
+            <button class="danger" onclick="delSource('{{ it.stem }}')">删除原视频</button>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="hint">视频放在 <code>samples/inbox/</code> 也可以，点扫描即可。</p>
+</main>
+
+<script>
+async function upload() {
+  const input = document.getElementById('file');
+  input.onchange = async () => {
+    const fd = new FormData();
+    for (const f of input.files) fd.append('files', f);
+    await fetch('/api/upload', { method: 'POST', body: fd });
+    refresh();
+  };
+  input.click();
+}
+async function scan() { await fetch('/api/scan', { method: 'POST' }); refresh(); }
+async function process(stem) {
+  await fetch('/api/process/' + encodeURIComponent(stem), { method: 'POST' });
+  pollStatus();
+}
+async function processAll() {
+  await fetch('/api/process_all', { method: 'POST' });
+  pollStatus();
+}
+async function refresh() {
+  const r = await fetch('/api/status'); const d = await r.json();
+  renderRows(d.items);
+}
+function renderRows(items) {
+  const tb = document.getElementById('rows');
+  tb.innerHTML = items.map(it => {
+    const procBtn = (it.source_exists && it.status !== 'done')
+      ? `<button onclick="process('${it.stem}')">处理</button>` : '';
+    const detailBtns = (it.status === 'done')
+      ? `<a href="/detail/${it.stem}">详情</a> <a href="/download_mp4/${it.stem}" download>⬇️ mp4</a>
+         <button class="danger-outline" onclick="delOutput('${it.stem}')">删除产物</button>` : '';
+    const delSrcBtn = it.source_exists
+      ? `<button class="danger" onclick="delSource('${it.stem}')">删除原视频</button>` : '';
+    return `
+    <tr data-stem="${it.stem}">
+      <td>${it.name}</td><td>${it.size_mb} MB</td>
+      <td class="status">${it.status}</td>
+      <td>${procBtn} ${detailBtns} ${delSrcBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function delSource(stem) {
+  if (!confirm(`确认删除 ${stem} 的原视频？(产物会保留)`)) return;
+  const r = await fetch('/api/delete_source/' + encodeURIComponent(stem), { method: 'POST' });
+  if (!r.ok) { alert('删除失败: ' + await r.text()); return; }
+  refresh();
+}
+
+async function delOutput(stem) {
+  if (!confirm(`确认删除 ${stem} 的产物目录？(原视频不动)`)) return;
+  const r = await fetch('/api/delete_output/' + encodeURIComponent(stem), { method: 'POST' });
+  if (!r.ok) { alert('删除失败: ' + await r.text()); return; }
+  refresh();
+}
+
+async function deleteAllSources() {
+  if (!confirm('确认删除 inbox 里的所有原视频？(产物不动)')) return;
+  const r = await fetch('/api/delete_all_sources', { method: 'POST' });
+  const d = await r.json();
+  alert(`已删 ${d.count} 个原视频`);
+  refresh();
+}
+// 已自动下过的 stem，避免重复触发
+const autoDownloaded = new Set();
+let polling = false;
+let autoDownloadMode = false;
+
+function triggerDownload(stem) {
+  if (autoDownloaded.has(stem)) return;
+  autoDownloaded.add(stem);
+  const a = document.createElement('a');
+  a.href = `/download_mp4/${encodeURIComponent(stem)}`;
+  a.download = `${stem}_sub.mp4`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function pollStatus() {
+  if (polling) return;
+  polling = true;
+  const tick = async () => {
+    const r = await fetch('/api/status'); const d = await r.json();
+    renderRows(d.items);
+    if (autoDownloadMode) {
+      for (const it of d.items) {
+        if (it.status === 'done' && !autoDownloaded.has(it.stem)) {
+          triggerDownload(it.stem);
+        }
+      }
+    }
+    const any = d.items.some(it => it.status && it.status.includes('processing'));
+    if (any) setTimeout(tick, 2000);
+    else { polling = false; autoDownloadMode = false; }
+  };
+  tick();
+}
+
+async function processAllAndDownload() {
+  autoDownloadMode = true;
+  autoDownloaded.clear();
+  // 已完成的先不在本次自动触发，避免突然下载一堆历史视频
+  const r = await fetch('/api/status'); const d = await r.json();
+  for (const it of d.items) if (it.status === 'done') autoDownloaded.add(it.stem);
+  await fetch('/api/process_all', { method: 'POST' });
+  pollStatus();
+  alert('开始处理所有未完成视频。每条处理完会自动下载 mp4 到你的浏览器下载目录。');
+}
+</script>
+</body>
+</html>

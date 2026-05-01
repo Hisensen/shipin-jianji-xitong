@@ -1,0 +1,66 @@
+# ─── 密钥 ───
+.env
+.env.local
+.env.*.local
+
+# ─── Python ───
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Node / Remotion ───
+node_modules/
+remotion/node_modules/
+remotion/.cache/
+remotion/out/
+*.log
+
+# ─── 大文件产物（用户视频、渲染输出、缓存）───
+output/
+uploads_remotion/
+samples/inbox/
+logs/
+snapshots/
+
+# Remotion 运行时素材（每次跑会重新生成，不需要进版本库）
+remotion/public/source.mp4
+remotion/public/cover_bg.jpg
+remotion/public/images/
+remotion/public/images_v3/
+remotion/public/images_v4/
+remotion/public/images_v5/
+
+# Promo 素材（demo 视频/音频，体积大）
+remotion/public/promo/before.mp4
+remotion/public/promo/after.mp4
+remotion/public/promo/voice.mp3
+remotion/public/promo/voice_cues.json
+remotion/public/promo/app_*.png
+promo/voice.mp3
+promo/voice_cues.json
+promo/_tmp_lines/
+
+# 自动生成的 cue 数据（每次 make_cues_*.py 跑会重写）
+remotion/src/realCues.ts
+remotion/src/realCuesV3.ts
+remotion/src/realCuesV4.ts
+remotion/src/realCuesV5.ts
+
+# ─── 系统 / IDE ───
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# ─── Playwright / 截图调试 ───
+.playwright-mcp/
+.verify/
+fonts/Kaiti.ttc

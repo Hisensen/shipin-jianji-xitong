@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>{{ stem }} — 详情</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>{{ stem }}</h1>
+  <nav>
+    <a href="/">← 返回</a>
+    <a href="/download/{{ stem }}">⬇️ 下载 zip</a>
+  </nav>
+</header>
+
+<main class="detail">
+  <section class="video-panel">
+    <h2>字幕视频</h2>
+    <video id="vid" controls src="/output/{{ stem }}/{{ stem }}_sub.mp4"></video>
+  </section>
+
+  <section class="cover-panel">
+    <h2>封面</h2>
+    <img id="cover" src="/output/{{ stem }}/{{ stem }}_cover.jpg?v={{ meta.elapsed }}">
+  </section>
+
+  <section class="meta-panel">
+    <h2>元数据</h2>
+    <dl>
+      <dt>标题</dt><dd id="title">{{ meta.title }} <span class="sub">({{ meta.title_source }})</span></dd>
+      <dt>时长</dt><dd>{{ meta.duration }}s</dd>
+      <dt>分辨率</dt><dd>{{ meta.width }}×{{ meta.height }}</dd>
+      <dt>字幕数</dt><dd>{{ meta.subtitle_count }}</dd>
+      <dt>封面帧时间</dt><dd id="ct">{{ meta.cover_frame_time }}s</dd>
+      <dt>耗时</dt><dd>{{ meta.elapsed }}s</dd>
+    </dl>
+    <button onclick="regenTitle()">🔄 重生成标题</button>
+
+    <h2>候选帧（点击换封面）</h2>
+    <div id="cands" class="cands"></div>
+  </section>
+</main>
+
+<script>
+async function regenTitle() {
+  const btn = event.target; btn.disabled = true; btn.textContent = '生成中...';
+  try {
+    const r = await fetch('/api/regen_title/{{ stem }}', { method: 'POST' });
+    if (!r.ok) { alert('失败: ' + await r.text()); return; }
+    const d = await r.json();
+    document.getElementById('title').innerHTML = d.title + ' <span class="sub">('+d.source+')</span>';
+    bustAssets();
+  } finally {
+    btn.disabled = false; btn.textContent = '🔄 重生成标题';
+  }
+}
+async function loadCands() {
+  const r = await fetch('/api/candidates/{{ stem }}');
+  const d = await r.json();
+  const c = document.getElementById('cands');
+  c.innerHTML = d.items.map(x =>
+    `<div class="cand" onclick="repick(${x.time})">
+       <img src="${x.url}"><span>${x.time.toFixed(2)}s</span>
+     </div>`).join('');
+}
+async function repick(t) {
+  const cands = document.getElementById('cands');
+  cands.classList.add('loading');
+  try {
+    const r = await fetch('/api/repick/{{ stem }}?time=' + t, { method: 'POST' });
+    if (!r.ok) { alert('失败: ' + await r.text()); return; }
+    document.getElementById('ct').textContent = t.toFixed(2) + 's';
+    bustAssets();
+  } finally {
+    cands.classList.remove('loading');
+  }
+}
+function bustAssets() {
+  const v = Date.now();
+  document.getElementById('cover').src = '/output/{{ stem }}/{{ stem }}_cover.jpg?v=' + v;
+  const vid = document.getElementById('vid');
+  vid.src = '/output/{{ stem }}/{{ stem }}_sub.mp4?v=' + v;
+  vid.load();
+}
+loadCands();
+</script>
+</body>
+</html>
