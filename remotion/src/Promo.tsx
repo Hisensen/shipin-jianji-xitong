@@ -14,12 +14,22 @@ import {
   useVideoConfig,
 } from "remotion";
 
+import { FONT_SMILEY_SANS, FONT_PANGMEN } from "./embeddedFonts";
+
 const SUB_FONT = "Smiley Sans";
 const TITLE_FONT = "PangMenZhengDao";
 
-const loadFont = (family: string, file: string, label: string) => {
-  const handle = delayRender(label, { timeoutInMilliseconds: 60000, retries: 2 });
-  new FontFace(family, `url(${staticFile(file)}) format("truetype")`)
+const dataUrlToBuffer = (dataUrl: string): ArrayBuffer => {
+  const base64 = dataUrl.split(",")[1];
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+};
+
+const loadFont = (family: string, dataUrl: string, label: string) => {
+  const handle = delayRender(label, { timeoutInMilliseconds: 120000, retries: 3 });
+  new FontFace(family, dataUrlToBuffer(dataUrl))
     .load()
     .then((loaded) => {
       (document.fonts as unknown as { add: (f: FontFace) => void }).add(loaded);
@@ -28,8 +38,8 @@ const loadFont = (family: string, file: string, label: string) => {
     .catch((err) => cancelRender(err));
 };
 
-loadFont(SUB_FONT, "fonts/SmileySans-Oblique.ttf", "Loading sub font");
-loadFont(TITLE_FONT, "fonts/PangMen.ttf", "Loading title font");
+loadFont(SUB_FONT, FONT_SMILEY_SANS, "Loading sub font");
+loadFont(TITLE_FONT, FONT_PANGMEN, "Loading title font");
 
 const FPS = 30;
 const ms = (x: number) => Math.round((x / 1000) * FPS);

@@ -13,13 +13,23 @@ import {
   useVideoConfig,
 } from "remotion";
 import { z } from "zod";
+import { FONT_SMILEY_SANS, FONT_PANGMEN } from "./embeddedFonts";
 
 const SUB_FONT = "Smiley Sans";
 const TITLE_FONT = "PangMenZhengDao";
 
-const loadFont = (family: string, file: string, label: string) => {
-  const handle = delayRender(label, { timeoutInMilliseconds: 180000, retries: 4 });
-  new FontFace(family, `url(${staticFile(file)}) format("truetype")`)
+// data: URL → ArrayBuffer 直接喂给 FontFace，最快路径
+const dataUrlToBuffer = (dataUrl: string): ArrayBuffer => {
+  const base64 = dataUrl.split(",")[1];
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+};
+
+const loadFont = (family: string, dataUrl: string, label: string) => {
+  const handle = delayRender(label, { timeoutInMilliseconds: 120000, retries: 3 });
+  new FontFace(family, dataUrlToBuffer(dataUrl))
     .load()
     .then((loaded) => {
       (document.fonts as unknown as { add: (f: FontFace) => void }).add(loaded);
@@ -28,8 +38,8 @@ const loadFont = (family: string, file: string, label: string) => {
     .catch((err) => cancelRender(err));
 };
 
-loadFont(SUB_FONT, "fonts/SmileySans-Oblique.ttf", "Loading subtitle font");
-loadFont(TITLE_FONT, "fonts/PangMen.ttf", "Loading title font");
+loadFont(SUB_FONT, FONT_SMILEY_SANS, "Loading subtitle font");
+loadFont(TITLE_FONT, FONT_PANGMEN, "Loading title font");
 
 const cueSchema = z.object({
   startFrame: z.number(),
