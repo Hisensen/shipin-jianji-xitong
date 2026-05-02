@@ -254,9 +254,10 @@ const PersistentTitleBar: React.FC<{ title: string; bandRatio: number }> = ({
 }) => {
   const { width, height } = useVideoConfig();
   const bandH = Math.round(height * bandRatio);
-  // 标题字号根据字数调整，宽度限制
+  // 标题字号：考虑 letterSpacing 5% + stroke 8% 的额外宽度占用
   const n = Math.max(1, title.length);
-  const widthBased = (width * 0.85) / n;
+  const charSlots = n + 0.05 * Math.max(0, n - 1) + 0.16;
+  const widthBased = (width * 0.85) / charSlots;
   const heightBased = bandH * 0.55;
   const fontSize = Math.round(Math.min(widthBased, heightBased));
   const strokeW = Math.max(2, Math.round(fontSize * 0.08));
@@ -972,14 +973,25 @@ const CoverScene: React.FC<{
   // - 顶部 15% 中心位置
   // - 字号根据字数：1-2 字 17%，3-4 字 15%，5-6 字 13%
   const titleLen = Math.max(1, (title ?? "").length);
-  const fontRatio =
-    titleLen <= 2 ? 0.17 : titleLen <= 4 ? 0.15 : 0.13;
-  // 同时受高度比例 + 宽度限制约束，取小者，保证不超出画面
-  const heightBased = height * fontRatio;
-  const widthBased = (width * 0.85) / titleLen; // 留 7.5% 左右边距
-  const fontSize = Math.round(Math.min(heightBased, widthBased));
-  const strokeW = Math.round(fontSize * 0.12);
-  const titleCenterY = Math.round(height * 0.15);
+  // 4 字以上换两行，让字号大幅放大
+  const useTwoLines = titleLen >= 4;
+  const totalLines = useTwoLines ? 2 : 1;
+  const charsPerLine = useTwoLines ? Math.ceil(titleLen / 2) : titleLen;
+  const lines = useTwoLines
+    ? [
+        (title ?? "").slice(0, charsPerLine),
+        (title ?? "").slice(charsPerLine),
+      ]
+    : [title ?? ""];
+  // 实际宽度 ≈ charsPerLine × fontSize + letterSpacing + stroke
+  const charSlots = charsPerLine + 0.04 * Math.max(0, charsPerLine - 1) + 0.24;
+  const widthBased = (width * 0.85) / charSlots;
+  // 总高度 ≤ 32% 画面（双行）/ 20%（单行）
+  const heightBased = (height * (useTwoLines ? 0.36 : 0.22)) / totalLines;
+  const fontSize = Math.round(Math.min(widthBased, heightBased));
+  const strokeW = Math.round(fontSize * 0.10);
+  // 标题块中心位置：双行时下移到 18% 让两行都在上半部
+  const titleCenterY = Math.round(height * (useTwoLines ? 0.20 : 0.15));
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
@@ -1007,27 +1019,30 @@ const CoverScene: React.FC<{
             right: 0,
             transform: "translateY(-50%)",
             display: "flex",
-            justifyContent: "center",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 0,
           }}
         >
-          <div
-            style={{
-              fontSize,
-              fontWeight: 900,
-              fontFamily: `'${TITLE_FONT}', '${SUB_FONT}', sans-serif`,
-              color: "white",
-              WebkitTextStroke: `${strokeW}px black`,
-              paintOrder: "stroke fill",
-              letterSpacing: Math.max(2, Math.round(fontSize * 0.04)),
-              whiteSpace: "nowrap",
-              maxWidth: width * 0.9,
-              textShadow: neonMode
-                ? "0 8px 24px rgba(0,0,0,0.8)"
-                : "none",
-            }}
-          >
-            {title}
-          </div>
+          {lines.map((line, i) => (
+            <div
+              key={i}
+              style={{
+                fontSize,
+                fontWeight: 900,
+                fontFamily: `'${TITLE_FONT}', '${SUB_FONT}', sans-serif`,
+                color: "white",
+                WebkitTextStroke: `${strokeW}px black`,
+                paintOrder: "stroke fill",
+                letterSpacing: Math.max(2, Math.round(fontSize * 0.04)),
+                lineHeight: 1.0,
+                whiteSpace: "nowrap",
+                textShadow: neonMode ? "0 8px 24px rgba(0,0,0,0.8)" : "none",
+              }}
+            >
+              {line}
+            </div>
+          ))}
         </div>
       ) : null}
     </AbsoluteFill>
