@@ -47,14 +47,14 @@ def transcribe_dashscope(
         )
 
         # 2) 调 paraformer-realtime-v2（接受本地文件，返回带时间戳）
-        result = Recognition.call(
+        recognition = Recognition(
             model=os.getenv("DASHSCOPE_ASR_MODEL", "paraformer-realtime-v2"),
             format="mp3",
             sample_rate=16000,
-            file_path=str(audio_path),
+            callback=None,
             language_hints=["zh"],
-            disfluency_removal_enabled=False,
         )
+        result = recognition.call(file=str(audio_path))
 
         if not result or result.status_code != 200:
             raise RuntimeError(
@@ -64,8 +64,8 @@ def transcribe_dashscope(
 
         # 3) 解析结果 — sentences 每条含 begin_time/end_time（毫秒）+ text
         segments: list[tuple[float, float, str]] = []
-        sentences = []
-        if hasattr(result, "output") and result.output:
+        sentences = result.get_sentence() if hasattr(result, "get_sentence") else []
+        if not sentences and hasattr(result, "output") and result.output:
             sentences = result.output.get("sentence", []) or []
         for s in sentences:
             text = (s.get("text") or "").strip()
