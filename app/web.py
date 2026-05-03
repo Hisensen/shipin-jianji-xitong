@@ -392,13 +392,15 @@ app.mount(
     name="remotion_output",
 )
 
-VALID_VERSIONS = {"v1", "v2", "v3", "v4", "v5"}
+VALID_VERSIONS = {"v1", "v2", "v3", "v4", "v5", "v6", "v7"}
 VERSION_LABELS = {
     "v1": "V1 基础（封面+章节+字幕+Pexels 角落图）",
     "v2": "V2 极简（去掉所有图）",
     "v3": "V3 智能（自动选 callout/emoji/图）",
     "v4": "V4 爆款（金句卡+章节白闪+关键词弹跳）",
-    "v5": "V5 顶配（音频踩点+全屏 B-roll+黑白黄）",
+    "v5": "V5 顶配 · 黑白黄爆款（适合女性情感赛道）",
+    "v6": "V6 报刊 · 米色衬线（适合知识深度赛道）",
+    "v7": "V7 极简 AI · 黑底蓝光 + 进度条（适合 AI/科技赛道）",
 }
 
 

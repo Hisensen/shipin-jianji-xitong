@@ -23,10 +23,9 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 from app.transcribe import transcribe  # noqa: E402
 from app.imagery import (  # noqa: E402
-    decide_per_cue_forms,
-    search_pexels,
-    download,
     CALLOUT_COLORS,
+    decide_per_cue_forms,
+    materialize_image,
 )
 from app.llm import extract_chapters, generate_title  # noqa: E402
 
@@ -96,7 +95,7 @@ def main() -> None:
         f"emoji {counter['emoji']} / none {counter['none']}"
     )
 
-    print("[4/7] 搜并下载 image 类的图...")
+    print("[4/7] 生成/下载 image 类的图...")
     images_dir = ROOT / "public" / "images_v3"
     if images_dir.exists():
         shutil.rmtree(images_dir)
@@ -106,20 +105,19 @@ def main() -> None:
         if d.get("form") != "image":
             continue
         kw = d.get("keyword", "")
-        if not kw:
-            d["form"] = "none"
-            continue
-        url = search_pexels(kw)
-        if not url:
-            print(f"      #{i} {kw!r} → 无结果，降级 none")
-            d["form"] = "none"
-            continue
         dst = images_dir / f"{i:02d}.jpg"
-        if download(url, dst):
+        provider = materialize_image(
+            keyword=kw,
+            context_text=texts[i],
+            dst=dst,
+            orientation="portrait",
+        )
+        if provider:
             d["imageSrc"] = f"images_v3/{dst.name}"
-            print(f"      #{i} {kw!r} → {dst.name} ✓")
+            print(f"      #{i} {kw!r} → {dst.name} ✓ ({provider})")
         else:
             d["form"] = "none"
+            print(f"      #{i} {kw!r} → 失败，降级 none")
 
     cues = []
     for i, ((start, end, text), d) in enumerate(zip(segments, decisions)):

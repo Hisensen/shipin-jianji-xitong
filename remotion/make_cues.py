@@ -26,7 +26,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 load_dotenv(PROJECT_ROOT / ".env")
 
 from app.transcribe import transcribe  # noqa: E402
-from app.imagery import pick_image_cues, search_pexels, download  # noqa: E402
+from app.imagery import materialize_image, pick_image_cues  # noqa: E402
 from app.llm import extract_chapters, generate_title  # noqa: E402
 
 FPS = 30
@@ -54,18 +54,18 @@ def main() -> None:
     duration = video_duration_seconds(src)
     duration_frames = int(round(duration * FPS))
 
-    print(f"[1/7] 转录 {src.name} (约 {duration:.1f}s)...")
+    print(f"[1/8] 转录 {src.name} (约 {duration:.1f}s)...")
     segments, lang = transcribe(src)
     print(f"      检测到语言: {lang}, 共 {len(segments)} 段")
     texts = [t for _, _, t in segments]
     transcript_joined = "".join(texts)
 
-    print("[2/7] DeepSeek 生成 ≤6 字爆款标题...")
+    print("[2/8] DeepSeek 生成 ≤6 字爆款标题...")
     title, title_src = generate_title(transcript_joined)
     print(f"      标题: 「{title}」 (来源: {title_src})")
     hashtag = f"#{title}"
 
-    print("[3/7] DeepSeek 切章节...")
+    print("[3/8] DeepSeek 切章节...")
     chapters_raw, ch_src = extract_chapters(segments, duration)
     print(f"      切了 {len(chapters_raw)} 段 (来源: {ch_src})")
     for c in chapters_raw:
@@ -79,12 +79,12 @@ def main() -> None:
         for c in chapters_raw
     ]
 
-    print("[4/7] DeepSeek 挑选关键句配图...")
+    print("[4/8] DeepSeek 挑选关键句配图...")
     picks = pick_image_cues(texts)
     for idx, kw in picks:
         print(f"      ★ #{idx} 「{texts[idx]}」 → {kw!r}")
 
-    print("[5/7] Pexels 搜图 + 下载...")
+    print("[5/8] 生成/下载配图...")
     images_dir = ROOT / "public" / "images"
     if images_dir.exists():
         shutil.rmtree(images_dir)
@@ -92,16 +92,18 @@ def main() -> None:
 
     image_for_idx: dict[int, str] = {}
     for idx, kw in picks:
-        if not kw:
-            continue
-        url = search_pexels(kw)
-        if not url:
-            print(f"      #{idx} {kw!r} → 无结果")
-            continue
         dst = images_dir / f"{idx:02d}.jpg"
-        if download(url, dst):
-            print(f"      #{idx} {kw!r} → {dst.name} ✓")
+        provider = materialize_image(
+            keyword=kw,
+            context_text=texts[idx],
+            dst=dst,
+            orientation="portrait",
+        )
+        if provider:
+            print(f"      #{idx} {kw!r} → {dst.name} ✓ ({provider})")
             image_for_idx[idx] = f"images/{dst.name}"
+        else:
+            print(f"      #{idx} {kw!r} → 失败，跳过")
 
     cues = []
     for i, (start, end, text) in enumerate(segments):

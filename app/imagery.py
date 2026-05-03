@@ -1,6 +1,7 @@
-"""字幕 → 关键词 → Pexels 搜图 → 下载到本地。"""
+"""字幕 → 关键词 → 生成/搜图 → 下载到本地。"""
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -9,7 +10,18 @@ from pathlib import Path
 
 import httpx
 
-from app.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+from app.config import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    DEEPSEEK_MODEL,
+    IMAGE_PROVIDER,
+    OPENAI_API_KEY,
+    OPENAI_IMAGE_MODEL,
+    OPENAI_IMAGE_MODERATION,
+    OPENAI_IMAGE_OUTPUT_COMPRESSION,
+    OPENAI_IMAGE_OUTPUT_FORMAT,
+    OPENAI_IMAGE_QUALITY,
+)
 
 log = logging.getLogger(__name__)
 
@@ -59,6 +71,15 @@ QUOTE_SYSTEM = (
     "isQuote 至多 3 项为 true。不要 markdown 围栏。"
 )
 
+REALISTIC_PHOTO_STYLE = (
+    "Photorealistic candid documentary-style photo. "
+    "It should feel like a real moment the speaker personally lived through and casually captured, "
+    "not a generic stock image. "
+    "Use natural lighting, believable skin texture, imperfect framing, lived-in details, "
+    "authentic environment, subtle emotion, and realistic camera noise. "
+    "No text, no watermark, no collage, no split screen, no illustration, no surreal effects."
+)
+
 
 def pick_quotes_and_emphasis(texts: list[str]) -> list[dict]:
     """每句返回 {"isQuote": bool, "emphasis": [...]}，长度 == len(texts)。无 key 时全 false。"""
@@ -70,7 +91,7 @@ def pick_quotes_and_emphasis(texts: list[str]) -> list[dict]:
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+        client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL, max_retries=5)
         user = "字幕：\n" + "\n".join(f"{i}. {t}" for i, t in enumerate(texts))
         resp = client.chat.completions.create(
             model=DEEPSEEK_MODEL,
@@ -126,7 +147,7 @@ def _decide_forms_one_batch(
     """
     from openai import OpenAI
 
-    client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+    client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL, max_retries=5)
     user = (
         f"全片共 {total} 句。这是第 {offset+1}-{offset+len(texts)} 句：\n"
         + "\n".join(f"{offset + i}. {t}" for i, t in enumerate(texts))
@@ -205,7 +226,7 @@ def pick_image_cues(texts: list[str]) -> list[tuple[int, str]]:
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+        client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL, max_retries=5)
         user = "字幕（按时间）：\n" + "\n".join(f"{i}. {t}" for i, t in enumerate(texts))
         resp = client.chat.completions.create(
             model=DEEPSEEK_MODEL,
@@ -247,7 +268,7 @@ def extract_keywords(texts: list[str]) -> list[str]:
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+        client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL, max_retries=5)
         user = "句子列表（按顺序）：\n" + "\n".join(f"{i+1}. {t}" for i, t in enumerate(texts))
         resp = client.chat.completions.create(
             model=DEEPSEEK_MODEL,
@@ -267,6 +288,97 @@ def extract_keywords(texts: list[str]) -> list[str]:
     except Exception as e:
         log.warning("提关键词失败 (%s)，降级空关键词", e)
         return [""] * len(texts)
+
+
+def _resolve_image_provider() -> str:
+    provider = IMAGE_PROVIDER
+    if provider in {"openai", "pexels"}:
+        return provider
+    if OPENAI_API_KEY:
+        return "openai"
+    if PEXELS_API_KEY:
+        return "pexels"
+    return "none"
+
+
+def _size_for_orientation(orientation: str) -> str:
+    if orientation == "landscape":
+        return "1536x1024"
+    if orientation == "square":
+        return "1024x1024"
+    return "1024x1536"
+
+
+def _build_realistic_image_prompt(
+    *,
+    keyword: str,
+    context_text: str,
+    orientation: str,
+) -> str:
+    framing = {
+        "portrait": "vertical smartphone photo, 9:16 feel",
+        "landscape": "horizontal photo, natural wide framing",
+        "square": "square crop photo, social-media friendly framing",
+    }.get(orientation, "vertical smartphone photo, 9:16 feel")
+    pieces = [
+        REALISTIC_PHOTO_STYLE,
+        f"Frame it as a {framing}.",
+    ]
+    if keyword:
+        pieces.append(f"Core visual subject: {keyword}.")
+    if context_text:
+        pieces.append(
+            "Spoken context from the video subtitle: "
+            f"\"{context_text.strip()}\". "
+            "Translate that line into a concrete real-life scene, not text on screen."
+        )
+    pieces.append(
+        "Focus on one specific everyday moment with concrete setting details, "
+        "natural body language, and cinematic realism without looking staged."
+    )
+    return "\n".join(pieces)
+
+
+def _generate_openai_image(
+    *,
+    keyword: str,
+    context_text: str,
+    dst: Path,
+    orientation: str,
+) -> bool:
+    if not OPENAI_API_KEY:
+        return False
+    prompt = _build_realistic_image_prompt(
+        keyword=keyword,
+        context_text=context_text,
+        orientation=orientation,
+    )
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=OPENAI_API_KEY, max_retries=5)
+        result = client.images.generate(
+            model=OPENAI_IMAGE_MODEL,
+            prompt=prompt,
+            size=_size_for_orientation(orientation),
+            quality=OPENAI_IMAGE_QUALITY,
+            moderation=OPENAI_IMAGE_MODERATION,
+            output_format=OPENAI_IMAGE_OUTPUT_FORMAT,
+            output_compression=OPENAI_IMAGE_OUTPUT_COMPRESSION,
+        )
+        item = result.data[0]
+        image_base64 = getattr(item, "b64_json", None)
+        if image_base64:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(base64.b64decode(image_base64))
+            return True
+        image_url = getattr(item, "url", None)
+        if image_url:
+            return download(image_url, dst)
+        raise RuntimeError("OpenAI images.generate 未返回 b64_json/url")
+    except Exception as e:
+        log.warning("OpenAI 生成图片失败 (%s): %s", keyword or context_text, e)
+        return False
 
 
 def search_pexels(keyword: str, orientation: str = "portrait") -> str | None:
@@ -289,6 +401,38 @@ def search_pexels(keyword: str, orientation: str = "portrait") -> str | None:
     except Exception as e:
         log.warning("Pexels 搜 %r 失败: %s", keyword, e)
         return None
+
+
+def materialize_image(
+    *,
+    keyword: str,
+    context_text: str,
+    dst: Path,
+    orientation: str = "portrait",
+) -> str | None:
+    """生成或下载一张配图，成功返回 provider 名称。"""
+    provider = _resolve_image_provider()
+    if provider == "openai":
+        if _generate_openai_image(
+            keyword=keyword,
+            context_text=context_text,
+            dst=dst,
+            orientation=orientation,
+        ):
+            return "openai"
+        if PEXELS_API_KEY and keyword:
+            url = search_pexels(keyword, orientation=orientation)
+            if url and download(url, dst):
+                return "pexels"
+        return None
+    if provider == "pexels":
+        if not keyword:
+            return None
+        url = search_pexels(keyword, orientation=orientation)
+        if url and download(url, dst):
+            return "pexels"
+        return None
+    return None
 
 
 def download(url: str, dst: Path) -> bool:

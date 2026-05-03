@@ -25,7 +25,7 @@ SYSTEM = (
 def _call_deepseek(transcript: str) -> str:
     from openai import OpenAI
 
-    client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+    client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL, max_retries=5)
     user = f"视频转录如下，给一个 1-6 字爆款标题：\n\n{transcript[:1500]}"
     resp = client.chat.completions.create(
         model=DEEPSEEK_MODEL,
@@ -56,7 +56,7 @@ CHAPTER_SYSTEM = (
 def _call_deepseek_chapters(transcript_with_ts: str, duration: float) -> str:
     from openai import OpenAI
 
-    client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+    client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL, max_retries=5)
     user = (
         f"视频总时长 {duration:.1f} 秒。下面是带时间戳的字幕：\n\n"
         f"{transcript_with_ts[:3500]}\n\n"

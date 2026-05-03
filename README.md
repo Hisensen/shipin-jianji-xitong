@@ -10,7 +10,7 @@
 
 | 版本 | 风格 | 包含元素 |
 |------|------|---------|
-| **V1 基础** | 朋友圈友好 | 封面 + 章节进度条 + Hashtag + 字幕高亮 + Pexels 角落配图 |
+| **V1 基础** | 朋友圈友好 | 封面 + 章节进度条 + Hashtag + 字幕高亮 + AI 角落配图 |
 | **V2 极简** | 强内容 | 同 V1，**去掉所有图片** |
 | **V3 智能** | 抖音节奏 | LLM 决策每句视觉形式（image / callout 卡 / emoji / 纯字幕）|
 | **V4 爆款** | 信息密度 | V3 + 金句全屏卡 + 章节白闪转场 + 关键词弹跳放大 |
@@ -27,7 +27,7 @@
 - **金句挖掘**：从字幕里找 1-3 句最具冲击力的金句，全屏黑底大字闪现
 - **形式决策**：LLM 给每句字幕挑最合适的视觉强化方式
 - **音频踩点**：分析音频波形提取真重音点，视觉打点跟你说话节奏同步
-- **自动配图**：Pexels API 搜实物图、自动 ken burns 缓推
+- **自动配图**：优先用 OpenAI GPT Image 生成真实生活感场景图，失败再降级 Pexels
 - **5 版本输出**：一次上传，5 个风格全产出
 - **黑白黄爆款配色**：高对比度，撕裂感强，对齐头部账号视觉
 
@@ -44,7 +44,8 @@
 │  Pipeline (Python)                              │
 │  ├─ faster-whisper      转录                    │
 │  ├─ DeepSeek API        标题/章节/形式决策      │
-│  ├─ Pexels API          搜图                    │
+│  ├─ OpenAI Images       真实场景配图生成        │
+│  ├─ Pexels API          搜图兜底                │
 │  ├─ Edge-TTS            promo 配音（可选）      │
 │  └─ ffmpeg / ffprobe    音视频处理              │
 ├─────────────────────────────────────────────────┤
@@ -98,12 +99,13 @@ cd ..
 ```bash
 cp .env.example .env
 # 编辑 .env，至少填好 DEEPSEEK_API_KEY
-# Pexels Key 可选（有就配图，没有就跳过 image 类）
+# 推荐再填 OPENAI_API_KEY，让系统直接生成真实感配图
 ```
 
 获取地址：
 - DeepSeek：https://platform.deepseek.com/（有送几百万免费 token）
-- Pexels：https://www.pexels.com/api/（完全免费）
+- OpenAI：https://platform.openai.com/
+- Pexels：https://www.pexels.com/api/（可选兜底，完全免费）
 
 ### 5. 字体准备
 
@@ -191,7 +193,7 @@ npm run dev
 │   ├── pipeline.py         # 烧字幕主流程
 │   ├── transcribe.py       # faster-whisper 包装
 │   ├── llm.py              # DeepSeek（标题、章节）
-│   ├── imagery.py          # 视觉决策、金句、Pexels
+│   ├── imagery.py          # 视觉决策、金句、OpenAI/Pexels 配图
 │   ├── audio_beats.py      # 音频波形 → 真重音帧
 │   ├── subtitle.py         # ASS 字幕生成 + ffmpeg 烧录
 │   ├── cover.py            # PIL 封面合成
@@ -250,7 +252,7 @@ Config.setJpegQuality(85);                         // 中间帧 JPEG 质量
 - 每个版本的数据在 `remotion/src/realCues*.ts`，可以手动改测试
 - Remotion Studio (`npm run dev`) 可实时预览 + 改 props
 - LLM 失败会自动降级（标题→截取转录头部，形式→全 none）
-- Pexels 搜不到图会跳过该 cue
+- OpenAI 图片生成失败时会自动降级到 Pexels；两者都失败则跳过该 cue
 - 短字幕段（<0.4 秒）的动画时间已用 `safeRange` 保护，不会崩
 
 ---
@@ -264,6 +266,7 @@ MIT
 - [Remotion](https://www.remotion.dev/) - React-based programmatic video framework
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) - Whisper inference 4x faster
 - [DeepSeek](https://www.deepseek.com/) - LLM API
+- [OpenAI Image Generation](https://platform.openai.com/docs/guides/image-generation) - GPT Image
 - [Pexels](https://www.pexels.com/) - Free stock images
 - [Smiley Sans](https://github.com/atelier-anchor/smiley-sans) - 得意黑字体
 - 庞门正道 - 标题字体

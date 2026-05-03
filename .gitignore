@@ -35,6 +35,8 @@ remotion/public/images/
 remotion/public/images_v3/
 remotion/public/images_v4/
 remotion/public/images_v5/
+remotion/public/images_v6/
+remotion/public/images_v7/
 
 # Promo 素材（demo 视频/音频，体积大）
 remotion/public/promo/before.mp4
@@ -51,6 +53,8 @@ remotion/src/realCues.ts
 remotion/src/realCuesV3.ts
 remotion/src/realCuesV4.ts
 remotion/src/realCuesV5.ts
+remotion/src/realCuesV6.ts
+remotion/src/realCuesV7.ts
 
 # ─── 系统 / IDE ───
 .DS_Store
@@ -64,3 +68,9 @@ Thumbs.db
 .playwright-mcp/
 .verify/
 fonts/Kaiti.ttc
+
+# ─── 本地开发工件（不进仓库）───
+.teamagent/
+CLAUDE.md
+remotion/make_cues_v6_emotion.py
+

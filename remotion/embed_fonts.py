@@ -18,9 +18,17 @@ ROOT = Path(__file__).resolve().parent
 FONTS_DIR = ROOT / "public" / "fonts"
 OUT = ROOT / "src" / "embeddedFonts.ts"
 
+FONTS_ROOT = Path(__file__).resolve().parent.parent / "fonts"
+
 FONTS = {
     "FONT_SMILEY_SANS": FONTS_DIR / "SmileySans-Oblique.ttf",
     "FONT_PANGMEN": FONTS_DIR / "PangMen.ttf",
+    # 设计字体
+    "FONT_FANGYUAN": FONTS_ROOT / "AlimamaFangYuanTi-Heavy.ttf",     # 圆体可爱（vlog）
+    "FONT_ZHUSHI": FONTS_ROOT / "YangRenDongZhuShi.ttf",             # 竹石毛笔感（中式）
+    "FONT_PUHUITI": FONTS_ROOT / "AlibabaPuHuiTi-3-105-Heavy.ttf",   # 现代黑体重
+    "FONT_GAODUANHEI": FONTS_ROOT / "ZcoolGaoduanhei.ttf",           # 站酷高端黑（精致）
+    "FONT_SHUHEITI": FONTS_ROOT / "AlimamaShuHeiTi.ttf",             # 书黑（雅致）
 }
 
 

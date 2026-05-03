@@ -85,6 +85,17 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
+# 图片来源：auto -> 优先 OpenAI 生成，其次 Pexels 搜图
+IMAGE_PROVIDER = os.getenv("IMAGE_PROVIDER", "auto").strip().lower()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+OPENAI_IMAGE_MODEL = os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2").strip()
+OPENAI_IMAGE_QUALITY = os.getenv("OPENAI_IMAGE_QUALITY", "high").strip().lower()
+OPENAI_IMAGE_MODERATION = os.getenv("OPENAI_IMAGE_MODERATION", "low").strip().lower()
+OPENAI_IMAGE_OUTPUT_FORMAT = os.getenv("OPENAI_IMAGE_OUTPUT_FORMAT", "jpeg").strip().lower()
+OPENAI_IMAGE_OUTPUT_COMPRESSION = int(
+    os.getenv("OPENAI_IMAGE_OUTPUT_COMPRESSION", "85")
+)
+
 # 视频扩展名
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".flv"}
 

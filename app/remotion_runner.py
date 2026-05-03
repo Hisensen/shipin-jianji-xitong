@@ -18,6 +18,8 @@ VERSION_TO_SCRIPT = {
     "v3": "make_cues_v3.py",
     "v4": "make_cues_v4.py",
     "v5": "make_cues_v5.py",
+    "v6": "make_cues_v6.py",
+    "v7": "make_cues_v7.py",
 }
 
 VERSION_TO_COMPOSITION = {
@@ -26,6 +28,8 @@ VERSION_TO_COMPOSITION = {
     "v3": "PublishVideo14V3",
     "v4": "PublishVideo14V4",
     "v5": "PublishVideo14V5",
+    "v6": "PublishVideo14V6",
+    "v7": "PublishVideo14V7",
 }
 
 
@@ -41,6 +45,9 @@ def run(
     script = VERSION_TO_SCRIPT[version]
     composition = VERSION_TO_COMPOSITION[version]
 
+    # 确保是绝对路径 — Remotion 渲染时 cwd=remotion/，相对路径会解析错位置
+    output_path = output_path.expanduser().resolve()
+    video_path = video_path.expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # 1) make_cues

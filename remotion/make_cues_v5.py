@@ -21,11 +21,10 @@ load_dotenv(PROJECT_ROOT / ".env")
 from app.transcribe import transcribe  # noqa: E402
 from app.subtitle import split_segments  # noqa: E402
 from app.imagery import (  # noqa: E402
-    decide_per_cue_forms,
-    pick_quotes_and_emphasis,
-    search_pexels,
-    download,
     CALLOUT_COLORS,
+    decide_per_cue_forms,
+    materialize_image,
+    pick_quotes_and_emphasis,
 )
 from app.llm import extract_chapters, generate_title  # noqa: E402
 from app.audio_beats import extract_beat_frames  # noqa: E402
@@ -104,7 +103,7 @@ def main() -> None:
     beat_frames = extract_beat_frames(src, fps=FPS)
     print(f"      检测到 {len(beat_frames)} 个重音点")
 
-    print("[6/9] 下载 image 类的图...")
+    print("[6/9] 生成/下载 image 类的图...")
     images_dir = ROOT / "public" / "images_v5"
     if images_dir.exists():
         shutil.rmtree(images_dir)
@@ -114,19 +113,19 @@ def main() -> None:
         if d.get("form") != "image":
             continue
         kw = d.get("keyword", "")
-        if not kw:
-            d["form"] = "none"
-            continue
-        url = search_pexels(kw)
-        if not url:
-            d["form"] = "none"
-            continue
         dst = images_dir / f"{i:02d}.jpg"
-        if download(url, dst):
+        provider = materialize_image(
+            keyword=kw,
+            context_text=texts[i],
+            dst=dst,
+            orientation="portrait",
+        )
+        if provider:
             d["imageSrc"] = f"images_v5/{dst.name}"
-            print(f"      #{i} {kw!r} → {dst.name} ✓")
+            print(f"      #{i} {kw!r} → {dst.name} ✓ ({provider})")
         else:
             d["form"] = "none"
+            print(f"      #{i} {kw!r} → 失败，降级 none")
 
     cues = []
     for i, ((start, end, text), d, q) in enumerate(zip(segments, decisions, quote_emph)):

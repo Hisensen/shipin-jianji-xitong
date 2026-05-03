@@ -8,6 +8,10 @@ import { realProps } from "./realCues";
 import { realPropsV3 } from "./realCuesV3";
 import { realPropsV4 } from "./realCuesV4";
 import { realPropsV5 } from "./realCuesV5";
+import { realPropsV6 } from "./realCuesV6";
+import { realPropsV7 } from "./realCuesV7";
+import { EditorialVideo, editorialSchema } from "./EditorialVideo";
+import { MinimalAIVideo, minimalAISchema } from "./MinimalAIVideo";
 import { Promo } from "./Promo";
 
 const noImageProps = { ...realProps, disableImages: true };
@@ -64,6 +68,26 @@ export const Root: React.FC = () => {
         height={1920}
         schema={subtitleSchema}
         defaultProps={realPropsV5}
+      />
+      <Composition
+        id="PublishVideo14V6"
+        component={EditorialVideo}
+        durationInFrames={realPropsV6.durationInFrames}
+        fps={30}
+        width={1080}
+        height={1920}
+        schema={editorialSchema}
+        defaultProps={realPropsV6}
+      />
+      <Composition
+        id="PublishVideo14V7"
+        component={MinimalAIVideo}
+        durationInFrames={realPropsV7.durationInFrames}
+        fps={30}
+        width={1080}
+        height={1920}
+        schema={minimalAISchema}
+        defaultProps={realPropsV7}
       />
       <Composition
         id="SubtitleWithImagesDemo"

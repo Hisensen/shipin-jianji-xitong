@@ -76,6 +76,7 @@ export const subtitleSchema = z.object({
   zoomFrames: z.array(z.number()).optional(),
   beatFrames: z.array(z.number()).optional(),
   neonMode: z.boolean().optional(),
+  emotionMode: z.boolean().optional(),
   width: z.number().optional(),
   height: z.number().optional(),
 });
@@ -129,6 +130,7 @@ export const SubtitleWithImages: React.FC<SubtitleProps> = ({
   durationInFrames,
   disableImages,
   neonMode,
+  emotionMode,
 }) => {
   const coverDur = coverDurationInFrames ?? 0;
   const videoDur = videoDurationInFrames ?? Math.max(1, durationInFrames - coverDur);
@@ -137,7 +139,13 @@ export const SubtitleWithImages: React.FC<SubtitleProps> = ({
     <AbsoluteFill style={{ backgroundColor: "black" }}>
       {coverDur > 0 ? (
         <Sequence from={0} durationInFrames={coverDur} layout="none">
-          <CoverScene title={title} coverBgSrc={coverBgSrc} hashtag={hashtag} neonMode={neonMode} />
+          <CoverScene
+            title={title}
+            coverBgSrc={coverBgSrc}
+            hashtag={hashtag}
+            neonMode={neonMode}
+            emotionMode={emotionMode}
+          />
         </Sequence>
       ) : null}
 
@@ -149,6 +157,7 @@ export const SubtitleWithImages: React.FC<SubtitleProps> = ({
           hashtag={hashtag}
           disableImages={disableImages}
           neonMode={neonMode}
+          emotionMode={emotionMode}
           title={title}
         />
       </Sequence>
@@ -163,14 +172,15 @@ const VideoScene: React.FC<{
   hashtag?: string;
   disableImages?: boolean;
   neonMode?: boolean;
+  emotionMode?: boolean;
   title?: string;
-}> = ({ videoSrc, cues, chapters, hashtag, disableImages, neonMode, title }) => {
+}> = ({ videoSrc, cues, chapters, hashtag, disableImages, neonMode, emotionMode, title }) => {
   // V5 4:5 布局：上 18% 持续标题条，下 82% 视频区
-  const TITLE_BAND = 0.18;
+  const TITLE_BAND = emotionMode ? 0.15 : 0.18;
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
       {/* 上方持续标题条 */}
-      {title ? <PersistentTitleBar title={title} bandRatio={TITLE_BAND} /> : null}
+      {title ? <PersistentTitleBar title={title} bandRatio={TITLE_BAND} emotionMode={emotionMode} /> : null}
 
       {/* 视频区：top = TITLE_BAND，向下铺满 */}
       <AbsoluteFill style={{ top: `${TITLE_BAND * 100}%`, bottom: 0, height: "auto" }}>
@@ -188,16 +198,23 @@ const VideoScene: React.FC<{
 
         {neonMode ? <NeonVignette /> : null}
 
-        {chapters && chapters.length > 0 ? <ChapterBar chapters={chapters} neonMode={neonMode} /> : null}
+        {chapters && chapters.length > 0 ? (
+          <ChapterBar chapters={chapters} neonMode={neonMode} emotionMode={emotionMode} />
+        ) : null}
 
-        {hashtag ? <HashtagPill hashtag={hashtag} neonMode={neonMode} /> : null}
+        {hashtag ? <HashtagPill hashtag={hashtag} neonMode={neonMode} emotionMode={emotionMode} /> : null}
 
       {cues.map((cue, i) => {
         const dur = Math.max(1, cue.endFrame - cue.startFrame);
         return (
           <Sequence key={i} from={cue.startFrame} durationInFrames={dur}>
             {cue.isQuote ? (
-              <QuoteCard text={cue.text} durationInFrames={dur} neonMode={neonMode} />
+              <QuoteCard
+                text={cue.text}
+                durationInFrames={dur}
+                neonMode={neonMode}
+                emotionMode={emotionMode}
+              />
             ) : (
               <CueOverlay
                 text={cue.text}
@@ -211,6 +228,7 @@ const VideoScene: React.FC<{
                 emphasis={cue.emphasis}
                 durationInFrames={dur}
                 neonMode={neonMode}
+                emotionMode={emotionMode}
               />
             )}
           </Sequence>
@@ -248,9 +266,10 @@ const computeBeatShake = (frame: number, beats: number[]): { x: number; y: numbe
   return { x: 0, y: 0 };
 };
 
-const PersistentTitleBar: React.FC<{ title: string; bandRatio: number }> = ({
+const PersistentTitleBar: React.FC<{ title: string; bandRatio: number; emotionMode?: boolean }> = ({
   title,
   bandRatio,
+  emotionMode,
 }) => {
   const { width, height } = useVideoConfig();
   const bandH = Math.round(height * bandRatio);
@@ -270,13 +289,16 @@ const PersistentTitleBar: React.FC<{ title: string; bandRatio: number }> = ({
         left: 0,
         width,
         height: bandH,
-        background:
-          "linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 70%, #2a2a2a 100%)",
-        borderBottom: "3px solid #FFD93D",
+        background: emotionMode
+          ? "linear-gradient(180deg, #1d1718 0%, #2d2326 58%, #3a2d31 100%)"
+          : "linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 70%, #2a2a2a 100%)",
+        borderBottom: emotionMode ? "2px solid rgba(246,224,214,0.7)" : "3px solid #FFD93D",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        boxShadow: "0 4px 20px rgba(255,217,61,0.25)",
+        boxShadow: emotionMode
+          ? "0 6px 18px rgba(0,0,0,0.28)"
+          : "0 4px 20px rgba(255,217,61,0.25)",
       }}
     >
       <div
@@ -284,11 +306,13 @@ const PersistentTitleBar: React.FC<{ title: string; bandRatio: number }> = ({
           fontFamily: `'${TITLE_FONT}', '${SUB_FONT}', sans-serif`,
           fontSize,
           fontWeight: 900,
-          color: "#FFD93D",
-          WebkitTextStroke: `${strokeW}px black`,
+          color: emotionMode ? "#F5E3DA" : "#FFD93D",
+          WebkitTextStroke: emotionMode ? `${Math.max(1, strokeW - 1)}px rgba(35,20,24,0.85)` : `${strokeW}px black`,
           paintOrder: "stroke fill",
           letterSpacing: Math.max(2, Math.round(fontSize * 0.05)),
-          textShadow: "0 4px 16px rgba(0,0,0,0.6)",
+          textShadow: emotionMode
+            ? "0 3px 14px rgba(0,0,0,0.35)"
+            : "0 4px 16px rgba(0,0,0,0.6)",
           whiteSpace: "nowrap",
         }}
       >
@@ -403,6 +427,7 @@ const CueOverlay: React.FC<{
   emphasis?: string[];
   durationInFrames: number;
   neonMode?: boolean;
+  emotionMode?: boolean;
 }> = ({
   text,
   imageSrc,
@@ -415,6 +440,7 @@ const CueOverlay: React.FC<{
   emphasis,
   durationInFrames,
   neonMode,
+  emotionMode,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
@@ -445,8 +471,8 @@ const CueOverlay: React.FC<{
     { extrapolateRight: "clamp" },
   );
 
-  const subFontSize = Math.round(height * 0.042);
-  const subBottom = Math.round(height * 0.06);
+  const subFontSize = Math.round(height * (emotionMode ? 0.038 : 0.042));
+  const subBottom = Math.round(height * (emotionMode ? 0.075 : 0.06));
   const subSidePad = Math.round(subFontSize * 0.5);
   const subVertPad = Math.round(subFontSize * 0.25);
 
@@ -478,9 +504,15 @@ const CueOverlay: React.FC<{
             src={resolveSrc(imageSrc)}
             style={{
               width: "100%",
-              borderRadius: 16,
-              border: neonMode ? "3px solid #FFD93D" : "3px solid white",
-              boxShadow: neonMode
+              borderRadius: emotionMode ? 22 : 16,
+              border: emotionMode
+                ? "2px solid rgba(255,245,240,0.9)"
+                : neonMode
+                  ? "3px solid #FFD93D"
+                  : "3px solid white",
+              boxShadow: emotionMode
+                ? "0 10px 26px rgba(19,10,12,0.28)"
+                : neonMode
                 ? "0 0 16px rgba(255,217,61,0.5), 0 8px 32px rgba(0,0,0,0.6)"
                 : "0 8px 32px rgba(0,0,0,0.6)",
               display: "block",
@@ -514,14 +546,17 @@ const CueOverlay: React.FC<{
       >
         <span
           style={{
-            color: "white",
+            color: emotionMode ? "#FFF9F7" : "white",
             fontSize: subFontSize,
-            fontWeight: 700,
+            fontWeight: emotionMode ? 600 : 700,
             fontFamily: `'${SUB_FONT}', 'PingFang SC', sans-serif`,
             padding: `${subVertPad}px ${subSidePad}px`,
-            backgroundColor: "rgba(0,0,0,0.75)",
+            backgroundColor: emotionMode ? "rgba(32,20,23,0.60)" : "rgba(0,0,0,0.75)",
             letterSpacing: 1,
-            lineHeight: 1.2,
+            lineHeight: 1.25,
+            borderRadius: emotionMode ? 18 : 0,
+            backdropFilter: emotionMode ? "blur(8px)" : undefined,
+            boxShadow: emotionMode ? "0 6px 22px rgba(0,0,0,0.18)" : undefined,
           }}
         >
           {renderEmphasizedText(text, emphasis, emphasisPop, neonMode)}
@@ -531,7 +566,11 @@ const CueOverlay: React.FC<{
   );
 };
 
-const ChapterBar: React.FC<{ chapters: Chapter[]; neonMode?: boolean }> = ({ chapters, neonMode }) => {
+const ChapterBar: React.FC<{ chapters: Chapter[]; neonMode?: boolean; emotionMode?: boolean }> = ({
+  chapters,
+  neonMode,
+  emotionMode,
+}) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const barH = Math.round(height * 0.055);
@@ -546,8 +585,9 @@ const ChapterBar: React.FC<{ chapters: Chapter[]; neonMode?: boolean }> = ({ cha
         width,
         height: barH,
         display: "flex",
-        backgroundColor: "#3A3A3A",
-        boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
+        backgroundColor: emotionMode ? "rgba(61,45,49,0.78)" : "#3A3A3A",
+        boxShadow: emotionMode ? "0 4px 10px rgba(0,0,0,0.18)" : "0 2px 4px rgba(0,0,0,0.5)",
+        backdropFilter: emotionMode ? "blur(8px)" : undefined,
       }}
     >
       {chapters.map((c, i) => {
@@ -559,16 +599,22 @@ const ChapterBar: React.FC<{ chapters: Chapter[]; neonMode?: boolean }> = ({ cha
             style={{
               flex: span,
               backgroundColor: isActive
-                ? neonMode
+                ? emotionMode
+                  ? "#E7CFC6"
+                  : neonMode
                   ? "#FFD93D"
                   : "#E5DDC8"
                 : "transparent",
               borderRight:
-                i < chapters.length - 1 ? "2px solid rgba(255,255,255,0.55)" : "none",
+                i < chapters.length - 1
+                  ? emotionMode
+                    ? "1px solid rgba(255,245,240,0.22)"
+                    : "2px solid rgba(255,255,255,0.55)"
+                  : "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: isActive ? "#000" : "white",
+              color: isActive ? (emotionMode ? "#2E1F22" : "#000") : "white",
               fontSize,
               fontWeight: 900,
               fontFamily: `'${TITLE_FONT}', '${SUB_FONT}', sans-serif`,
@@ -584,7 +630,11 @@ const ChapterBar: React.FC<{ chapters: Chapter[]; neonMode?: boolean }> = ({ cha
   );
 };
 
-const HashtagPill: React.FC<{ hashtag: string; neonMode?: boolean }> = ({ hashtag, neonMode }) => {
+const HashtagPill: React.FC<{ hashtag: string; neonMode?: boolean; emotionMode?: boolean }> = ({
+  hashtag,
+  neonMode,
+  emotionMode,
+}) => {
   const { width, height } = useVideoConfig();
   const top = Math.round(height * 0.085);
   const left = Math.round(width * 0.04);
@@ -599,15 +649,24 @@ const HashtagPill: React.FC<{ hashtag: string; neonMode?: boolean }> = ({ hashta
         top,
         left,
         padding: `${padY}px ${padX}px`,
-        backgroundColor: neonMode ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.65)",
+        backgroundColor: emotionMode
+          ? "rgba(53,35,39,0.58)"
+          : neonMode
+            ? "rgba(0,0,0,0.85)"
+            : "rgba(0,0,0,0.65)",
         borderRadius: 999,
-        color: "#FFD93D",
+        color: emotionMode ? "#F7E2D9" : "#FFD93D",
         fontSize,
         fontWeight: 800,
         fontFamily: `'${SUB_FONT}', sans-serif`,
         letterSpacing: 1,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
-        border: neonMode ? "2px solid #FFD93D" : "none",
+        boxShadow: emotionMode ? "0 4px 10px rgba(0,0,0,0.14)" : "0 2px 8px rgba(0,0,0,0.5)",
+        border: emotionMode
+          ? "1px solid rgba(255,245,240,0.28)"
+          : neonMode
+            ? "2px solid #FFD93D"
+            : "none",
+        backdropFilter: emotionMode ? "blur(10px)" : undefined,
       }}
     >
       {hashtag}
@@ -663,7 +722,8 @@ const QuoteCard: React.FC<{
   text: string;
   durationInFrames: number;
   neonMode?: boolean;
-}> = ({ text, durationInFrames, neonMode }) => {
+  emotionMode?: boolean;
+}> = ({ text, durationInFrames, neonMode, emotionMode }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
 
@@ -694,8 +754,10 @@ const QuoteCard: React.FC<{
   const fontSize = Math.round(height * fontRatio);
   const strokeW = Math.round(fontSize * 0.06);
 
-  const quoteColor = "#FFD93D";
-  const quoteGlow = "0 8px 32px rgba(0,0,0,0.85)";
+  const quoteColor = emotionMode ? "#FFF4EE" : "#FFD93D";
+  const quoteGlow = emotionMode
+    ? "0 8px 24px rgba(0,0,0,0.28)"
+    : "0 8px 32px rgba(0,0,0,0.85)";
 
   return (
     <AbsoluteFill>
@@ -721,9 +783,11 @@ const QuoteCard: React.FC<{
             fontWeight: 900,
             fontFamily: `'${TITLE_FONT}', '${SUB_FONT}', sans-serif`,
             color: quoteColor,
-            WebkitTextStroke: `${strokeW}px black`,
+            WebkitTextStroke: emotionMode
+              ? `${Math.max(1, Math.round(strokeW * 0.4))}px rgba(47,28,31,0.55)`
+              : `${strokeW}px black`,
             paintOrder: "stroke fill",
-            letterSpacing: 4,
+            letterSpacing: emotionMode ? 2 : 4,
             textAlign: "center",
             maxWidth: width * 0.85,
             lineHeight: 1.15,
@@ -964,7 +1028,8 @@ const CoverScene: React.FC<{
   coverBgSrc?: string;
   hashtag?: string;
   neonMode?: boolean;
-}> = ({ title, coverBgSrc, hashtag, neonMode }) => {
+  emotionMode?: boolean;
+}> = ({ title, coverBgSrc, hashtag, neonMode, emotionMode }) => {
   const { width, height } = useVideoConfig();
 
   // 标题样式跟 Python pipeline 完全对齐：
@@ -1008,7 +1073,18 @@ const CoverScene: React.FC<{
         />
       ) : null}
 
-      {hashtag ? <HashtagPill hashtag={hashtag} neonMode={neonMode} /> : null}
+      {emotionMode ? (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(180deg, rgba(28,18,20,0.28) 0%, rgba(28,18,20,0.08) 36%, rgba(20,12,15,0.44) 100%)",
+          }}
+        />
+      ) : null}
+
+      {hashtag ? <HashtagPill hashtag={hashtag} neonMode={neonMode} emotionMode={emotionMode} /> : null}
 
       {title ? (
         <div
@@ -1031,13 +1107,19 @@ const CoverScene: React.FC<{
                 fontSize,
                 fontWeight: 900,
                 fontFamily: `'${TITLE_FONT}', '${SUB_FONT}', sans-serif`,
-                color: "white",
-                WebkitTextStroke: `${strokeW}px black`,
+                color: emotionMode ? "#FFF7F3" : "white",
+                WebkitTextStroke: emotionMode
+                  ? `${Math.max(1, Math.round(strokeW * 0.55))}px rgba(43,26,29,0.7)`
+                  : `${strokeW}px black`,
                 paintOrder: "stroke fill",
                 letterSpacing: Math.max(2, Math.round(fontSize * 0.04)),
                 lineHeight: 1.0,
                 whiteSpace: "nowrap",
-                textShadow: neonMode ? "0 8px 24px rgba(0,0,0,0.8)" : "none",
+                textShadow: emotionMode
+                  ? "0 8px 18px rgba(0,0,0,0.22)"
+                  : neonMode
+                    ? "0 8px 24px rgba(0,0,0,0.8)"
+                    : "none",
               }}
             >
               {line}
