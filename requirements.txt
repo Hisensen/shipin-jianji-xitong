@@ -9,3 +9,4 @@ opencv-python>=4.9
 numpy>=1.26
 httpx>=0.27
 openai>=1.30
+dashscope>=1.20
